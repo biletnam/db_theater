@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>theater test</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <script src="/socket.io/socket.io.js"></script>
+
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css" integrity="sha384-PsH8R72JQ3SOdhVi3uxftmaW6Vc51MKb0q5P2rRUpPvrszuE4W1povHYgTpBfshb" crossorigin="anonymous">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+  <!--<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script> -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.3/umd/popper.min.js" integrity="sha384-vFJXuSJphROIrBnz7yo7oB41mKfc8JzQZiCq4NCceLEaO4IHwicKwpJf9c9IpFgh" crossorigin="anonymous"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js" integrity="sha384-alpBpkh1PFOepccYVYDB4do5UnbKysX5WZXm3XxPqe5iKTfUKjNkCk9SaVuEZflJ" crossorigin="anonymous"></script>
+  
+  <script>
+    //intializing socket --> automatically connect to server socket
+    var socket=io();
+    $(function(){
+      checkseat();
+
+      $('#seatcancel').on('show.bs.modal', function (event) {
+        var button = $(event.relatedTarget); // Button that triggered the modal
+        var seatid = button.attr("data-seatid"); // Extract info from data-* attributes
+        // If necessary, you could initiate an AJAX request here (and then do the updating in a callback).
+        // Update the modal's content. We'll use jQuery here, but you could use a data binding library or other methods instead.
+        var modal = $(this);
+        //modal.find('.modal-title').text('New message to ' + recipient);
+        modal.find("#btnCancel").attr("data-seatid",seatid);
+        socket.emit("check",seatid,function(sockres){
+          console.log(sockres);
+          modal.find('.modal-title').text("the seat is already taken by " + sockres.name );
+        });
+      });
+
+      $("#seatbook").on("show.bs.modal",function(event){
+        var button = $(event.relatedTarget); // Button that triggered the modal
+        var seatid = button.attr("data-seatid"); // Extract info from data-* attributes
+
+        var modal = $(this);
+        modal.find("#btnBook").attr("data-seatid",seatid);
+      });
+
+      $("#btnBook").on("click",function(event){
+        socket.emit("book",{name:$("#booker-name").val(),phone:$("#booker-phone").val(),seatid:$("#btnBook").attr("data-seatid")});
+      });
+
+      $("#btnCancel").on("click",function(event){
+        socket.emit("cancel",{seatid:$("#btnCancel").attr("data-seatid"),phone:$("#canceller-phone").val()});
+      });
+
+      socket.on("refresh",function(){
+        checkseat();
+      });
+      
+      socket.on("wrongphone",function(){
+        alert("잘못된 전화번호입니다.");
+      });
+
+      function checkseat(){
+        $.getJSON("/data",function(seatdata){
+          console.log(seatdata);
+          $(".seat").each(function(i){
+            if(seatdata[i].buyer){
+              $(this).addClass("taken");
+              $(this).attr("data-target","#seatcancel");
+              console.log($(this).data("target"));
+            }else if(!seatdata[i].buyer && $(this).hasClass("taken")){
+              $(this).removeClass("taken");
+              $(this).attr("data-target","#seatbook");
+            }
+          });
+        });
+      }
+    });
+  </script>
+  <style>
+    .taken{
+      background-color:darkred;
+    }
+    .taken:hover{
+      background-color:red;
+    }
+    .taken:active{
+      background-color:red;
+    }
+    table{
+      width:100%;
+      text-align:center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="jumbotron">
+      <h1>Seat Bookings</h1>
+      <p>you can book a seat or cancel an order</p>
+    </div>
+  </div>
+  <div class="container">
+    <table>
+      <% data.forEach(function(item,index){ %>
+      <%   if (index % 10 === 0 && index != 0) { %>
+      </tr>
+      <%   } %>
+      <%   if (index % 10 === 0 && index != data.length) { %>
+      <tr>
+      <%   } %>
+      <td><button type="button" data-toggle="modal" data-target="#seatbook" class="btn btn-primary seat" data-seatid="<%= item.seatid %>"><%= item.seatid %></button></td>
+      <% }); %>
+    </table>
+  </div>
+
+  <div class="modal fade" id="seatbook" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="exampleModalLabel">The seat is empty</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+          </div>
+          <div class="modal-body">
+            Do you wish to book this seat?
+            <form>
+              <div class="form-group">
+                <label for="booker-name" class="col-form-label">Name:</label>
+                <input type="text" class="form-control" id="booker-name">
+              </div>
+              <div class="form-group">
+                <label for="booker-phone" class="col-form-label">Phone:</label>
+                <input type="text" class="form-control" id="booker-phone">
+              </div>
+            </form>
+          </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+          <button type="button" id="btnBook" class="btn btn-primary" data-dismiss="modal">Book</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="seatcancel" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="exampleModalLabel">The seat is already taken</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+          </div>
+          <div class="modal-body">
+            enter correct phone number of the booker to cancel
+            <form>
+              <div class="form-group">
+                <label for="canceller-phone" class="col-form-label">Phone:</label>
+                <input type="text" class="form-control" id="canceller-phone">
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+            <button type="button" id="btnCancel" class="btn btn-primary" data-dismiss="modal">Cancel the book</button>
+          </div>
+      </div>
+    </div>
+  </div>
+
+
+</body>
+</html>
